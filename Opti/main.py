@@ -1,7 +1,8 @@
 from pandas import read_excel
 from gurobipy import Model, quicksum, GRB
 from pprint import pprint
-
+from collections import defaultdict
+from openpyxl import load_workbook
 
 # Set timer 30 min
 
@@ -22,13 +23,61 @@ ciclos = range(1, 5)
 
 ### Database
 # Usar el read_excel de pandas
-cantidades_nutrientes = list
-costos = list
-aportes = list
-#presupuesto = int
-demandas = list
-disponibilidad = list
-costos_stg = list
+path_aporte_nutricional = "Datos/aporte_nutricional.xlsx"
+path_costos_almacenamiento = "Datos/Costos_almacenamiento.xlsx"
+path_costos = "Datos/Costos.xlsx"
+path_demanda_comida = "Datos/Demanda_comida.xlsx"
+path_disponibilidad = "Datos/Disponibilidad.xlsx"
+path_requerimiento = "Datos/Requerimiento_nutricional.xlsx"
+
+#Obtencion datos de demanda !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+demandas = []
+lectura_demanda = read_excel(path_demanda_comida)
+for linea in lectura_demanda.iterrows():
+    lista_linea = [dato for dato in linea[1][1:]]
+    demandas.append(lista_linea)
+
+#Obtencion datos aporte nutricional
+aportes = []
+lectura_aportes = read_excel(path_aporte_nutricional)
+for linea in lectura_aportes.iterrows():
+    lista_linea = [dato for dato in linea[1][1:]]
+    aportes.append(lista_linea)
+
+#Obtencion datos costos de almacenamiento
+
+costos_stg = []
+lectura_costos_stg = read_excel(path_costos_almacenamiento)
+for linea in lectura_costos_stg.iterrows():
+    lista_linea = [dato for dato in linea[1][1:]]
+    costos_stg.append(lista_linea[0])
+
+#Obtencion datos costos alimentos
+costos = []
+lectura_costos = read_excel(path_costos)
+for linea in lectura_costos.iterrows():
+    lista_linea = [dato for dato in linea[1][1:]]
+    costos.append(lista_linea)
+
+#Obtencion datos requerimientos nutricionales
+cantidades_nutrientes = []
+lectura_requerimiento = read_excel(path_requerimiento)
+for linea in lectura_requerimiento.iterrows():
+    lista_linea = [dato for dato in linea[1][1:]]
+    cantidades_nutrientes.append(lista_linea[0])
+
+#Obtencion datos disponibilidad
+disponibilidad = []
+lectura_disponibilidad = read_excel(path_disponibilidad)
+for linea in lectura_disponibilidad.iterrows():
+    lista_linea = [dato for dato in linea[1][1:]]
+    disponibilidad.append(lista_linea)
+
+presupuesto = 300566878
+
+
+pprint(demandas)
+
 
 
 model = Model()
@@ -41,26 +90,26 @@ i = model.addVars(comidas, dias, semanas, vtype=GRB.INTEGER, name="i_jdm")
 z = model.addVars(comidas, dias, semanas, vtype=GRB.BINARY, name="z_jdm")
 
 ### Params
-b = {(f,s): cantidades_nutrientes[f][s] for f in nutrientes for s in ciclos}
-c = {(j, m, r): costos[j][m][r] for j in comidas for m in semanas for r in regiones}
-a = {(f, j): aportes[f][j] for f in nutrientes for j in comidas}
-q = {(d, m): demandas[d][m] for d in dias for m in semanas}
-n = {(j, m, r): disponibilidad[j][m][r] for j in comidas for m in semanas for r in regiones}
-g = {j: costos_stg[j] for j in comidas}
+b = {(f): cantidades_nutrientes[f] for f in nutrientes } #LISTO
+c = {(j, r): costos[j][r] for j in comidas for r in regiones} #LISTO
+a = {(f, j): aportes[j][f] for j in comidas for f in nutrientes}  #LISTO
+q = {(d, m): demandas[d][m] for d in dias for m in semanas} #Demanda puesta diaria y semanalmente por region, elegir cual usar
+n = {(j, m): disponibilidad[j][m] for j in comidas for m in semanas} #Eliminar region ,modificar excel para que quede por semanas y no meses
+g = {r: costos_stg[r] for r in regiones} #LISTO
 # Params hay clases)?
 
 ### Restrs
 #1
 model.addConstrs(
-    (quicksum(x[j, d, m] * a[f, j]for j in comidas) >= b[f, s] 
-     for d in dias for m in semanas for f in nutrientes[:7] for s in ciclos),
+    (quicksum(x[j, d, m] * a[j, f]for j in comidas) >= b[f] 
+     for d in dias for m in semanas for f in nutrientes[:7]),
      name="Cantidad minima de nutrientes"
 )
 
 #2
 model.addConstrs(
-    (quicksum(x[j, d, m] * a[f, j]for j in comidas) <= b[f, s] 
-     for d in dias for m in semanas for f in nutrientes[7:] for s in ciclos),
+    (quicksum(x[j, d, m] * a[j, f]for j in comidas) <= b[f] 
+     for d in dias for m in semanas for f in nutrientes[7:]),
      name="Cantidad maxima de nutrientes"
 )
 
@@ -84,7 +133,11 @@ model.addConstrs(
 )
 
 #4.2
-#Falta agregarla
+model.addConstrs(
+    (y[d, m] <= x[j, d, m]
+    for j in comidas for d in dias for m in semanas),
+    name= "Relacion entre X e Y"
+)
 
 #5
 model.addConstrs(
@@ -93,20 +146,20 @@ model.addConstrs(
 )
 
 #6
-# Presupuesto, eliminar)?
-""" model.addConstr(
+# Presupuesto
+model.addConstr(
     quicksum(
         quicksum(
             quicksum(
                 quicksum(
-                    c[j, m, r] * x[j, d, m] + g[j] * i[j, d, m] <= presupuesto
+                    c[j, r] * x[j, d, m] + g[r] * i[j, d, m] <= presupuesto
                     for r in regiones
                 ) for m in semanas
             ) for d in dias
         ) for j in comidas
     ),
     name="No superar el presupuesto"
-) """
+) 
 
 #7
 model.addConstrs(
@@ -117,8 +170,8 @@ model.addConstrs(
 
 #8
 model.addConstrs(
-    ((quicksum(w[j, d, m]) for d in dias) <= n[j, m, r]
-    for j in comidas for r in regiones for m in semanas),
+    ((quicksum(w[j, d, m]) for d in dias) <= n[j, m]
+    for j in comidas for m in semanas),
     name="No se puede compras mas de la comida disponible"
 )
 
@@ -164,7 +217,7 @@ model.setObjective(
         quicksum(
             quicksum(
                 quicksum(
-                    c[j, m, r] * x[j, d, m] + g[j] * i[j, d, m]
+                    c[j, r] * x[j, d, m] + g[r] * i[j, d, m]
                     for r in regiones
                 ) for m in semanas
             ) for d in dias
