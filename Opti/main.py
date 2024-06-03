@@ -73,7 +73,7 @@ for linea in lectura_disponibilidad.iterrows():
     lista_linea = [dato for dato in linea[1][1:]]
     disponibilidad.append(lista_linea)
 
-presupuesto = 300566878
+presupuesto = 300566878000
 
 
 
@@ -104,17 +104,17 @@ model.addConstrs(
 )
 
 #2
-model.addConstrs(
+'''model.addConstrs(
     (quicksum(x[j, d, m] * a[j, f]for j in comidas) <= b[f] 
-     for d in dias for m in semanas for f in nutrientes[7:]),
+     for d in dias for m in semanas for f in nutrientes[6:]),
      name="Cantidad maxima de nutrientes"
-)
-
+)'''
+ 
 #3.1
-model.addConstrs(
+""" model.addConstrs(
     (quicksum(z[j, d, m] for d in dias) <= 2 for j in comidas for m in semanas),
     name="Repeticiones de comida maxima"
-)
+) """
 
 #3.2
 model.addConstrs(
@@ -128,27 +128,27 @@ model.addConstrs(
     (z[j, d+1, m] <= (z[j, d, m] + 10**-6)  for j in comidas 
      for d in dias[:4] for m in semanas),
     name="No repetir comida 2 dias seguidos" 
-)
+) 
 
 #4.1
 model.addConstrs(
     (x[j, d, m] <= 100000000000000000000 * y[d, m]
     for j in comidas for d in dias for m in semanas),
     name="Relacion entre X e Y"
-)
+) 
 
 #4.2
 model.addConstrs(
     (y[d, m] <= x[j, d, m]
     for j in comidas for d in dias for m in semanas),
     name= "Relacion entre X e Y"
-)
+) 
 
 #5
 model.addConstrs(
     (z[j, d, m] <= y[d, m] for j in comidas for d in dias for m in semanas),
     name="Relacion entre Z e Y"
-)
+) 
 
 #6
 # Presupuesto
@@ -179,23 +179,23 @@ model.addConstrs(
     for j in comidas for m in semanas),
     name="No se puede compras mas de la comida disponible"
 )
-
+ 
 #9
 model.addConstrs(
     (i[j, 1, 1] == 0 for j in comidas), name="Inventario comienza vacio"
-)
+) 
 
 #10
 model.addConstrs(
     (i[j, d, 1] == i[j, d-1, 1] + w[j, d, 1] - x[j, d, 1] for j in comidas for d in dias[1:]),
     name="Primera semana de inventario"
-)
+) 
 
 #11
 model.addConstrs(
     (i[j, d, m] == i[j, d-1, m] + w[j, d, m] - x[j, d, m] for j in comidas for d in dias[1:] for m in semanas[1:]),
     name="Inventario luego de la primera semana"
-)
+) 
 
 #12
 # Completar indices
