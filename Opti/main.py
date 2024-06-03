@@ -7,19 +7,23 @@ from openpyxl import load_workbook
 # Set timer 30 min
 
 ### Conjuntos
-nutrientes = range(1, 10)
+nutrientes = range(0, 9)
 nombres_nutrientes = [
     "Proteinas", "Carbohidratos", "Vitaminas", "Minerales",
     "Calcio", "Magnesio", "Grasas", "Sodio", "Azucares"
 ]
-comidas = list # Contar cuántas comidas hay
+comidas = range(0, 33)
 nombres_comidas = [
-    "Carne", "Pavo", "Chamcho", "pollo"
+    "Carne", "Pavo", "Chancho", "Pollo", "Atun", "Huevo",
+    "Porotos", "Pure", "Arroz", "Fideos", "Papas", "Lentejas",
+    "Zanahoria", "Lechuga", "Tomate", "Brocoli", "Coliflor", "Apio", "Manzana", 
+    "Platano", "Pera", "Naranja", "Durazno", "Piña", "Leche",
+    "Yogurt", "Flan", "Arroz con leche", "Mousse", "Pan",
+    "Cereal", "Galletones", "Barritas"
 ] # Lista con los nombres de la comida, terminar
-dias = range(1, 8)
-semanas = range(1, 53)
-regiones = range(1, 17)
-ciclos = range(1, 5)
+dias = range(0, 5)
+semanas = range(0, 52)
+regiones = range(0, 16)
 
 ### Database
 # Usar el read_excel de pandas
@@ -30,12 +34,8 @@ path_demanda_comida = "Datos/Demanda_comida.xlsx"
 path_disponibilidad = "Datos/Disponibilidad.xlsx"
 path_requerimiento = "Datos/Requerimiento_nutricional.xlsx"
 
-#Obtencion datos de demanda !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-demandas = []
-lectura_demanda = read_excel(path_demanda_comida)
-for linea in lectura_demanda.iterrows():
-    lista_linea = [dato for dato in linea[1][1:]]
-    demandas.append(lista_linea)
+#Obtencion datos de demanda 
+demandas = [[524822 for i in range(0,5)] for i in range(0,52)]
 
 #Obtencion datos aporte nutricional
 aportes = []
@@ -76,9 +76,6 @@ for linea in lectura_disponibilidad.iterrows():
 presupuesto = 300566878
 
 
-pprint(demandas)
-
-
 
 model = Model()
 
@@ -92,9 +89,9 @@ z = model.addVars(comidas, dias, semanas, vtype=GRB.BINARY, name="z_jdm")
 ### Params
 b = {(f): cantidades_nutrientes[f] for f in nutrientes } #LISTO
 c = {(j, r): costos[j][r] for j in comidas for r in regiones} #LISTO
-a = {(f, j): aportes[j][f] for j in comidas for f in nutrientes}  #LISTO
-q = {(d, m): demandas[d][m] for d in dias for m in semanas} #Demanda puesta diaria y semanalmente por region, elegir cual usar
-n = {(j, m): disponibilidad[j][m] for j in comidas for m in semanas} #Eliminar region ,modificar excel para que quede por semanas y no meses
+a = {(j, f): aportes[j][f] for j in comidas for f in nutrientes}  #LISTO
+q = {(m, d): demandas[m][d] for m in semanas for d in dias} #Demanda puesta diaria y semanalmente por region, elegir cual usar
+n = {(j, m): disponibilidad[j][m] for j in comidas for m in semanas} #
 g = {r: costos_stg[r] for r in regiones} #LISTO
 # Params hay clases)?
 
@@ -121,7 +118,15 @@ model.addConstrs(
 
 #3.2
 model.addConstrs(
-    (z[j, d, m] != z[j, d+1, m] for j in comidas for d in dias[:7] for m in semanas),
+    ((z[j, d, m] - 10**-6) <= z[j, d+1, m] for j in comidas 
+     for d in dias[:4] for m in semanas),
+    name="No repetir comida 2 dias seguidos" 
+)
+
+#3.3
+model.addConstrs(
+    (z[j, d+1, m] <= (z[j, d, m] + 10**-6)  for j in comidas 
+     for d in dias[:4] for m in semanas),
     name="No repetir comida 2 dias seguidos" 
 )
 
@@ -152,25 +157,25 @@ model.addConstr(
         quicksum(
             quicksum(
                 quicksum(
-                    c[j, r] * x[j, d, m] + g[r] * i[j, d, m] <= presupuesto
+                    c[j, r] * x[j, d, m] + g[r] * i[j, d, m]
                     for r in regiones
                 ) for m in semanas
             ) for d in dias
-        ) for j in comidas
-    ),
+        ) for j in comidas 
+    ) <= presupuesto,
     name="No superar el presupuesto"
 ) 
 
 #7
 model.addConstrs(
-    (quicksum(x[j, d, m] + i[j, d, m] for j in comidas) >= q[d, m]
+    (quicksum(x[j, d, m] + i[j, d, m] for j in comidas) >= q[m, d]
      for d in dias for m in semanas),
      name="Satisfacer demanda"
 )
 
 #8
 model.addConstrs(
-    ((quicksum(w[j, d, m]) for d in dias) <= n[j, m]
+    (quicksum(w[j, d, m] for d in dias) <= n[j, m]
     for j in comidas for m in semanas),
     name="No se puede compras mas de la comida disponible"
 )
@@ -195,18 +200,18 @@ model.addConstrs(
 #12
 # Completar indices
 model.addConstrs(
-    (quicksum(z[j, d, m] for j in None) +
-     quicksum(z[j, d, m] for j in None) +
-     quicksum(z[j, d, m] for j in None) +
-     quicksum(z[j, d, m] for j in None)
+    (quicksum(z[j, d, m] for j in comidas[:6]) +
+     quicksum(z[j, d, m] for j in comidas[6:13]) +
+     quicksum(z[j, d, m] for j in comidas[13:19]) +
+     quicksum(z[j, d, m] for j in comidas[19:25]) >= 4
      for d in dias for m in semanas),
      name="Almuerzos completos con todos los tipos de comida"
 )
 
 #13
 model.addConstrs(
-    (quicksum(z[j, d, m] for j in None) +
-    quicksum(z[j, d, m] for j in None)
+    (quicksum(z[j, d, m] for j in comidas[25:30]) +
+    quicksum(z[j, d, m] for j in comidas[30:]) >= 2
     for d in dias for m in semanas),
     name="Desayunos completos con todos los tipos de comida"
 )
@@ -231,6 +236,6 @@ model.optimize()
 ### Manejo de resultados
 print("\n"+"-"*25+"Manejo de resultados"+"-"*25+"\n")
 
-print(f"El valor óptimo del problema es de ${model.objVal}\n")
+print(f"El valor óptimo del problema es de ${model.ObjVal}\n")
 
 # Hacer prints de 
