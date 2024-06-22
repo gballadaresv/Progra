@@ -197,7 +197,6 @@ model.addConstrs(
      name="Almuerzos completos con todos los tipos de comida"
 )
 
-
 #12
 model.addConstrs(
     (quicksum(z[j, d, m] for j in comidas[24:29]) == 1
@@ -209,6 +208,7 @@ model.addConstrs(
     for d in dias for m in semanas),
     name="Desayunos completos con todos los tipos de comida"
 )
+
 
 ### Funcion objetivo
 model.setObjective(
@@ -223,7 +223,6 @@ model.setObjective(
         ) for j in comidas
     )
 )
-
 
 model.optimize()
 
@@ -244,7 +243,6 @@ for j in comidas:
     porcentajes.append(porcentaje)
 
 
-
 carnes = list(zip(nombres_comidas[:6], porcentajes[6:]))
 acompañamientos = list(zip(nombres_comidas[6:12], porcentajes[6:12]))
 verduras = list(zip(nombres_comidas[12:18], porcentajes[12:18]))
@@ -252,12 +250,14 @@ frutas = list(zip(nombres_comidas[18:24], porcentajes[18:24]))
 lacteos = list(zip(nombres_comidas[24:29], porcentajes[24:29]))
 desayunos = list(zip(nombres_comidas[29:], porcentajes[29:]))
 
+
 carnes = sorted(carnes, key=lambda lista: lista[1], reverse=True)
 acompañamientos = sorted(acompañamientos, key=lambda lista: lista[1], reverse=True)
 verduras = sorted(verduras, key=lambda lista: lista[1], reverse=True)
 frutas = sorted(frutas, key=lambda lista: lista[1], reverse=True)
 lacteos = sorted(lacteos, key=lambda lista: lista[1], reverse=True)
 desayunos = sorted(desayunos, key=lambda lista: lista[1], reverse=True)
+
 
 listas = [carnes, acompañamientos, verduras, frutas, lacteos, desayunos]
 
