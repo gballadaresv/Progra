@@ -158,25 +158,19 @@ model.addConstrs(
 
 #8
 model.addConstrs(
-    (i[j, 4, 51, r] == 0 for j in comidas for r in regiones),
-    name="Inventario termina vacio"
-)
-
-#9
-model.addConstrs(
     (i[j, d, 1, r] == i[j, d-1, 1, r] + w[j, d, 1] - x[j, d, 1, r] 
     for j in comidas for r in regiones for d in dias[1:]),
     name="Primera semana de inventario"
 ) 
 
-#10
+#9
 model.addConstrs(
     (i[j, d, m, r] == i[j, d-1, m, r] + w[j, d, m] - x[j, d, m, r] 
      for j in comidas for d in dias[1:] for r in regiones for m in semanas[1:]),
     name="Inventario luego de la primera semana"
 ) 
 
-#11
+#10
 model.addConstrs(
     (quicksum(z[j, d, m] for j in comidas[:6]) == 1
      for d in dias for m in semanas),
@@ -199,7 +193,7 @@ model.addConstrs(
 )
 
 
-#12
+#11
 model.addConstrs(
     (quicksum(z[j, d, m] for j in comidas[24:29]) == 1
          for d in dias for m in semanas),
