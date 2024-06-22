@@ -58,7 +58,7 @@ for linea in lectura_requerimiento.iterrows():
 
 #Obtencion datos disponibilidad
 disponibilidad = []
-lectura_disponibilidad = read_excel("Datos/Disponibilidad3.xlsx")
+lectura_disponibilidad = read_excel("Datos/Disponibilidad.xlsx")
 for linea in lectura_disponibilidad.iterrows():
     lista_linea = [dato for dato in linea[1][1:]]
     disponibilidad.append(lista_linea)
@@ -70,19 +70,18 @@ clases = [dato[1][0] for dato in lectura_clases.iterrows()]
 # Fuente detallada en el informe
 presupuesto = 300566878000
 
-
 model = Model()
 
 # Tiempo máximo de la ejecución del código
 model.setParam("TimeLimit", 1800)
 
-### Vars
+### Variables
 w = model.addVars(comidas, dias, semanas, vtype=GRB.INTEGER, name="w_jdm")
 x = model.addVars(comidas, dias, semanas, regiones, vtype=GRB.INTEGER, name="x_jdmr")
 i = model.addVars(comidas, dias, semanas, regiones, vtype=GRB.INTEGER, name="i_jdmr")
 z = model.addVars(comidas, dias, semanas, vtype=GRB.BINARY, name="z_jdm")
 
-### Params
+### Parametros
 b = {(f): cantidades_nutrientes[f] for f in nutrientes } 
 c = {(j, r): costos[j][r] for j in comidas for r in regiones}
 a = {(j, f): aportes[j][f] for j in comidas for f in nutrientes}
@@ -91,7 +90,7 @@ n = {(j, m): disponibilidad[j][m] for j in comidas for m in semanas}
 g = {(r, j): costos_stg[r][j] for r in regiones for j in comidas}
 y = {(m): clases[m] for m in semanas}
 
-### Restrs
+### Restricciones
 #1
 model.addConstrs(
     (quicksum(x[j, d, m, r] * a[j, f]for j in comidas) >= b[f] 
@@ -99,6 +98,7 @@ model.addConstrs(
      name="Cantidad minima de nutrientes"
 )
  
+
 #2
 # Gurobi no tiene soporte para restricciones de desigualdad (no igual),
 # por lo que hay que separarla en 2 restricciones, esto equivale a un !=
@@ -117,16 +117,11 @@ model.addConstrs(
 model.addConstrs(
     (x[j, d, m, r] >= y[m]
     for j in comidas for d in dias for m in semanas for r in regiones),
-    name= "Relacion entre X e Y"
+    name= "Relacion entre X e Y (2)"
 )
+
 
 #4
-model.addConstrs(
-    (z[j, d, m] <= y[m] for j in comidas for d in dias for m in semanas),
-    name="Relacion entre Z e Y"
-)
-
-#5
 model.addConstr(
     quicksum(
         quicksum(
@@ -141,32 +136,38 @@ model.addConstr(
     name="No superar el presupuesto"
 )
 
-#6
+#5
 model.addConstrs(
     (quicksum(x[j, d, m, r] + i[j, d, m, r] for j in comidas) >= q[r, m]
      for d in dias for m in semanas for r in regiones),
      name="Satisfacer demanda"
 )
 
-#7
+#6
 model.addConstrs(
     (quicksum(w[j, d, m] for d in dias) <= n[j, m]
     for j in comidas for m in semanas),
     name="No se puede compras mas de la comida disponible"
 )
  
-#8
+#7
 model.addConstrs(
     (i[j, 1, 1, r] == 0 for j in comidas for r in regiones),
     name="Inventario comienza vacio"
 ) 
 
-#9
+#8
 model.addConstrs(
     (i[j, 4, 51, r] == 0 for j in comidas for r in regiones),
     name="Inventario termina vacio"
 )
 
+#9
+model.addConstrs(
+    (i[j, d, 1, r] == i[j, d-1, 1, r] + w[j, d, 1] - x[j, d, 1, r] 
+    for j in comidas for r in regiones for d in dias[1:]),
+    name="Primera semana de inventario"
+) 
 
 #10
 model.addConstrs(
@@ -197,6 +198,7 @@ model.addConstrs(
      name="Almuerzos completos con todos los tipos de comida"
 )
 
+
 #12
 model.addConstrs(
     (quicksum(z[j, d, m] for j in comidas[24:29]) == 1
@@ -224,6 +226,7 @@ model.setObjective(
     )
 )
 
+
 model.optimize()
 
 ### Manejo de resultados
@@ -238,9 +241,11 @@ def porcentajeador(x):
 
 porcentajes = []
 for j in comidas:
-    porcentaje = round(porcentajeador(sum(z[j, d, m].x for d in dias for m in semanas)), 4)
+    porcentaje = round(porcentajeador(sum(z[j, d, m].x 
+                                          for d in dias for m in semanas)), 4)
     print(f"El porcentaje de {nombres_comidas[j]} es del {porcentaje}%")
     porcentajes.append(porcentaje)
+
 
 
 carnes = list(zip(nombres_comidas[:6], porcentajes[6:]))
@@ -250,7 +255,6 @@ frutas = list(zip(nombres_comidas[18:24], porcentajes[18:24]))
 lacteos = list(zip(nombres_comidas[24:29], porcentajes[24:29]))
 desayunos = list(zip(nombres_comidas[29:], porcentajes[29:]))
 
-
 carnes = sorted(carnes, key=lambda lista: lista[1], reverse=True)
 acompañamientos = sorted(acompañamientos, key=lambda lista: lista[1], reverse=True)
 verduras = sorted(verduras, key=lambda lista: lista[1], reverse=True)
@@ -258,19 +262,24 @@ frutas = sorted(frutas, key=lambda lista: lista[1], reverse=True)
 lacteos = sorted(lacteos, key=lambda lista: lista[1], reverse=True)
 desayunos = sorted(desayunos, key=lambda lista: lista[1], reverse=True)
 
-
 listas = [carnes, acompañamientos, verduras, frutas, lacteos, desayunos]
 
 def maximo(lista):
     return max(lista, key=lambda lista: lista[1])[1]
 
 
-carnes_max = [carnes[i][0] for i in range(len(carnes)) if carnes[i][1] == maximo(carnes)]
-acompañamientos_max = [acompañamientos[i][0] for i in range(len(acompañamientos)) if acompañamientos[i][1] == maximo(acompañamientos)]
-verduras_max = [verduras[i][0] for i in range(len(verduras)) if verduras[i][1] == maximo(verduras)]
-frutas_max = [frutas[i][0] for i in range(len(frutas)) if frutas[i][1] == maximo(frutas)]
-lacteos_max = [lacteos[i][0] for i in range(len(lacteos)) if lacteos[i][1] == maximo(lacteos)]
-desayunos_max = [desayunos[i][0] for i in range(len(desayunos)) if desayunos[i][1] == maximo(desayunos)]
+carnes_max = [carnes[i][0] for i in range(len(carnes)) 
+              if carnes[i][1] == maximo(carnes)]
+acompañamientos_max = [acompañamientos[i][0] for i in range(len(acompañamientos)) 
+                       if acompañamientos[i][1] == maximo(acompañamientos)]
+verduras_max = [verduras[i][0] for i in range(len(verduras)) 
+                if verduras[i][1] == maximo(verduras)]
+frutas_max = [frutas[i][0] for i in range(len(frutas)) 
+              if frutas[i][1] == maximo(frutas)]
+lacteos_max = [lacteos[i][0] for i in range(len(lacteos)) 
+               if lacteos[i][1] == maximo(lacteos)]
+desayunos_max = [desayunos[i][0] for i in range(len(desayunos)) 
+                 if desayunos[i][1] == maximo(desayunos)]
 
 print("\n")
 
