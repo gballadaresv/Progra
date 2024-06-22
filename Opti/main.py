@@ -1,12 +1,5 @@
 from pandas import read_excel
 from gurobipy import Model, quicksum, GRB
-from pprint import pprint
-
-### Cambios
-# La demanda no es diaria, es semanal y por regiones
-# Variable Y pasa a ser parametro
-# Variables subindice r
-# param g es [r,j]
 
 ### Conjuntos
 nutrientes = range(0, 9)
