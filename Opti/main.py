@@ -65,7 +65,7 @@ for linea in lectura_requerimiento.iterrows():
 
 #Obtencion datos disponibilidad
 disponibilidad = []
-lectura_disponibilidad = read_excel("Datos/Disponibilidad.xlsx")
+lectura_disponibilidad = read_excel("Datos/Disponibilidad3.xlsx")
 for linea in lectura_disponibilidad.iterrows():
     lista_linea = [dato for dato in linea[1][1:]]
     disponibilidad.append(lista_linea)
@@ -106,12 +106,6 @@ model.addConstrs(
      name="Cantidad minima de nutrientes"
 )
  
-#borrada (3.2)
-""" model.addConstrs(
-    (quicksum(z[j, d, m] for d in dias) <= 4 for j in comidas for m in semanas),
-    name="Repeticiones de comida maxima"
-) """
-
 #2
 # Gurobi no tiene soporte para restricciones de desigualdad (no igual),
 # por lo que hay que separarla en 2 restricciones, esto equivale a un !=
@@ -127,25 +121,17 @@ model.addConstrs(
 )
 
 #3
-# En el informe fueron definidas 2 restricciones bajo el mismo nombre, esto
-# debido a que la relacion debe ser descrita por dos restricciones
-""" model.addConstrs(
-    (x[j, d, m, r] <= 10**10 * y[m]
-    for j in comidas for d in dias for m in semanas for r in regiones),
-    name="Relacion entre X e Y (1)"
-) 
-"""
 model.addConstrs(
     (x[j, d, m, r] >= y[m]
     for j in comidas for d in dias for m in semanas for r in regiones),
-    name= "Relacion entre X e Y (2)"
+    name= "Relacion entre X e Y"
 )
 
 #4
-""" model.addConstrs(
+model.addConstrs(
     (z[j, d, m] <= y[m] for j in comidas for d in dias for m in semanas),
     name="Relacion entre Z e Y"
-)  """
+)
 
 #5
 model.addConstr(
@@ -183,35 +169,20 @@ model.addConstrs(
 ) 
 
 #9
-""" model.addConstrs(
+model.addConstrs(
     (i[j, 4, 51, r] == 0 for j in comidas for r in regiones),
     name="Inventario termina vacio"
-) """
+)
+
 
 #10
-model.addConstrs(
-    (i[j, d, 1, r] == i[j, d-1, 1, r] + w[j, d, 1] - x[j, d, 1, r] 
-    for j in comidas for r in regiones for d in dias[1:]),
-    name="Primera semana de inventario"
-) 
-
-#11
 model.addConstrs(
     (i[j, d, m, r] == i[j, d-1, m, r] + w[j, d, m] - x[j, d, m, r] 
      for j in comidas for d in dias[1:] for r in regiones for m in semanas[1:]),
     name="Inventario luego de la primera semana"
 ) 
 
-#12
-""" model.addConstrs(
-    (quicksum(z[j, d, m] for j in comidas[:6]) +
-     quicksum(z[j, d, m] for j in comidas[6:13]) +
-     quicksum(z[j, d, m] for j in comidas[13:19]) +
-     quicksum(z[j, d, m] for j in comidas[19:25]) >= 4
-     for d in dias for m in semanas),
-     name="Almuerzos completos con todos los tipos de comida"
-) """
-
+#11
 model.addConstrs(
     (quicksum(z[j, d, m] for j in comidas[:6]) == 1
      for d in dias for m in semanas),
@@ -234,7 +205,7 @@ model.addConstrs(
 )
 
 
-#13
+#12
 model.addConstrs(
     (quicksum(z[j, d, m] for j in comidas[24:29]) == 1
          for d in dias for m in semanas),
@@ -245,16 +216,6 @@ model.addConstrs(
     for d in dias for m in semanas),
     name="Desayunos completos con todos los tipos de comida"
 )
-
-""" model.addConstrs(
-    (x[j, d, m, r] <= z[j,  d, m] * 10**20
-     for j in comidas for d in dias for m in semanas for r in regiones),
-     name="Relación entre z y x"
-) """
-
-""" model.addConstrs(
-    (z[j, d, m] + z[j, d+1, m] == 1 for j in comidas for d in dias[:4] for m in semanas)
-) """
 
 ### Funcion objetivo
 model.setObjective(
